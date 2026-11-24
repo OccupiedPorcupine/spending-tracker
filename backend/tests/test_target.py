@@ -75,6 +75,15 @@ def test_switch_refused_when_the_sheet_cannot_be_opened(two, monkeypatch):
     assert two.get("/api/settings").json()["sheet_target"] == "dev"
 
 
+def test_switch_refused_when_the_sheet_is_only_readable(two):
+    two.sheets["live"].read_only = True  # like a link-shared sheet the app was never given edit access to
+    r = two.post("/api/settings", json={"sheet_target": "live"})
+    assert r.status_code == 409 and "can't edit" in r.json()["detail"]
+    assert two.get("/api/settings").json()["sheet_target"] == "dev"
+    two.sheets["live"].read_only = False
+    assert two.post("/api/settings", json={"sheet_target": "live"}).json()["sheet_target"] == "live"
+
+
 def test_switch_refused_while_entries_are_waiting(two):
     conn = connect()
     conn.execute("INSERT INTO entries (id, payload, status, sheet_id, created_at, updated_at) VALUES (?, ?, 'failed', ?, ?, ?)",

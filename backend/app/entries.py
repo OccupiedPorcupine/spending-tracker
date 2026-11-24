@@ -274,10 +274,11 @@ async def switch_sheet(target: str, svc: SheetService, conn: sqlite3.Connection)
         new = backend_for(target)
         m = await asyncio.to_thread(new.meta)
         await asyncio.to_thread(new.grid, False)
+        await asyncio.to_thread(new.check_edit)
     except Exception as e:  # noqa: BLE001
         who = service_account_email() or "the app's service account"
         log.warning("switch to %s refused: cannot open the sheet (%s)", target, type(e).__name__)
-        raise HTTPException(409, f"the app can't open the {target} sheet. Share it with {who} as Editor, "
+        raise HTTPException(409, f"the app can't edit the {target} sheet. Share it with {who} as Editor, "
                                  "then try again") from None
     async with svc.lock:  # no write is half-way through while the target changes
         set_setting(conn, "sheet_target", target)

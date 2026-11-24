@@ -74,6 +74,9 @@ class SheetBackend(Protocol):
     def update_row(self, row: int, cells: list[Any]) -> None: ...
     def check_row(self, row: int) -> RowCheck: ...
     def delete_row(self, row: int) -> None: ...
+    def check_edit(self) -> None:
+        """Raise if the app may read but not edit this spreadsheet (e.g. it is only link-shared)."""
+        ...
 
 
 def pad(r: list[Any]) -> list[Any]:
@@ -194,6 +197,13 @@ class GoogleSheet:
         self._batch([{"deleteDimension": {"range": {
             "sheetId": self.meta().gid, "dimension": "ROWS", "startIndex": row - 1, "endIndex": row}}}])
 
+    def check_edit(self) -> None:
+        # The Sheets API has no permission check, so write the title it already has: a change of
+        # nothing that still fails with 403 when the app can only read (a link-shared sheet).
+        title = self.meta(refresh=True).title
+        self._service().spreadsheets().batchUpdate(spreadsheetId=self.id, body={"requests": [
+            {"updateSpreadsheetProperties": {"properties": {"title": title}, "fields": "title"}}]}).execute()
+
 
 # --------------------------------------------------------------------------- fake for tests
 
@@ -304,6 +314,12 @@ class FakeSheet:
         num = lambda x: isinstance(x, (int, float)) and not isinstance(x, bool)  # noqa: E731
         d = from_serial(v[1])
         return RowCheck(num(v[0]), d is not None, f"{d.month}/{d.day}/{d.year}" if d else "", num(v[COL["U"]]), v[COL["Q"]])
+
+    read_only = False
+
+    def check_edit(self) -> None:
+        if self.read_only:
+            raise PermissionError("read-only")
 
     def delete_row(self, row: int) -> None:
         self._maybe_fail("delete_row")
