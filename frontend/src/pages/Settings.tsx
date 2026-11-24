@@ -5,6 +5,7 @@ import { lockNow } from '../lib/auth';
 import { Seg } from '../components/Seg';
 import * as queue from '../lib/queue';
 import { save } from '../lib/store';
+import { currentTheme, setTheme, type Theme } from '../lib/theme';
 import type { Meta } from '../lib/types';
 
 interface Status {
@@ -29,6 +30,7 @@ export function Settings({ meta, items, onLocked, onSheetChanged }: {
   const [target, setTarget] = useState<Target | null>(null);
   const [targets, setTargets] = useState<Record<Target, boolean>>({ dev: true, live: false });
   const [switching, setSwitching] = useState(false);
+  const [theme, setThemeState] = useState<Theme>(currentTheme);
   const [msg, setMsg] = useState<string | null>(null);
 
   const load = async () => {
@@ -96,6 +98,12 @@ export function Settings({ meta, items, onLocked, onSheetChanged }: {
             <dt>Last sheet call</dt><dd>{status ? (status.last_sheet_call.ok === false ? 'failed' : 'ok') + ', ' + when(status.last_sheet_call.at) : '…'}</dd>
             <dt>Last saved entry</dt><dd>{when(status?.last_write_at ?? null)}</dd>
           </dl>
+        </section>
+        <section className="card">
+          <h2>Appearance</h2>
+          <Seg label="Theme" value={theme} onChange={(t) => { setTheme(t); setThemeState(t); }}
+            options={[{ value: 'system', label: 'System' }, { value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }]} />
+          <p className="muted small">Saved on this device. System follows your phone's light or dark setting.</p>
         </section>
         <section className="card">
           <h2>Queue</h2>
