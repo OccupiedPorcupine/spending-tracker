@@ -25,7 +25,20 @@ def main(argv=None) -> None:
     s = sub.add_parser("sessions", help="list or end sessions")
     s.add_argument("--end-all", action="store_true")
     sub.add_parser("ledger", help="ledger summary")
+    ev = sub.add_parser("ai-eval", help="run a phrase set (JSON on stdin) through the AI parser and score it")
+    ev.add_argument("--currency", default="SGD", help="default currency to assume (default SGD)")
     a = p.parse_args(argv)
+
+    if a.cmd == "ai-eval":
+        import asyncio
+        import json
+        import sys
+
+        from .ai_eval import evaluate
+        conn = connect()
+        migrate(conn)
+        conn.close()
+        sys.exit(asyncio.run(evaluate(json.load(sys.stdin), a.currency)))
 
     conn = connect()
     migrate(conn)

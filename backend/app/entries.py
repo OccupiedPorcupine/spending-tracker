@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field, field_validator
 from . import __version__
 from .config import settings
 from .db import connect, get_db, get_setting, now_ms, set_setting
+from .parse import month_usage
 from .writer import (SheetError, SheetService, cells_for, fingerprint_for, note_suggestions, recent, today, totals)
 from .sheets import ROW_LIMIT, ROW_WARN
 
@@ -217,6 +218,7 @@ async def status(request: Request, conn: sqlite3.Connection = Depends(get_db)):
         "ledger": counts,
         "last_write_at": int(last) if last else None,
         "last_sheet_call": {"ok": svc.health.ok, "at": svc.health.at},
+        "ai": month_usage(conn),
         "version": __version__,
     }
 

@@ -19,6 +19,9 @@ class Settings:
     google_sa_file: str = field(default_factory=lambda: os.environ.get("GOOGLE_SA_FILE", "/run/secrets/google-sa.json"))
     session_idle_days: int = field(default_factory=lambda: int(os.environ.get("SESSION_IDLE_DAYS", "30")))
     openai_model: str = field(default_factory=lambda: os.environ.get("OPENAI_MODEL", "gpt-6-luna"))
+    # USD per million tokens, for the cost estimate on the settings page (gpt-6-luna list prices).
+    openai_price_in: float = field(default_factory=lambda: float(os.environ.get("OPENAI_PRICE_IN", "0.10")))
+    openai_price_out: float = field(default_factory=lambda: float(os.environ.get("OPENAI_PRICE_OUT", "0.50")))
     # Hosts allowed only for /api/health (the container healthcheck and deploy.sh call it on localhost).
     local_hosts: list[str] = field(default_factory=lambda: _list("LOCAL_HOSTS", "127.0.0.1,localhost"))
     # Extra origins accepted in local development, e.g. http://localhost:5184. Empty in production.

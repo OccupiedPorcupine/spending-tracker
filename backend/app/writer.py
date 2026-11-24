@@ -266,6 +266,28 @@ def note_suggestions(grid: list[list[Any]], limit: int = 300) -> list[dict]:
     return [last[k] | {"uses": c} for k, c in count.most_common(limit)]
 
 
+def recent_examples(grid: list[list[Any]], limit: int = 20) -> list[dict]:
+    """The most recently dated distinct notes, each with its category, required flag and currency.
+    This is all the AI parser ever sees of the sheet: no amounts, dates, totals or row numbers."""
+    rows = []
+    for i, r in enumerate(grid):
+        n, cat, cur = r[COL["F"]], r[COL["C"]], r[COL["E"]]
+        if not isinstance(n, str) or not n.strip() or not cat or cur not in ("SGD", "MYR"):
+            continue
+        b = r[COL["B"]]
+        rows.append(((b if isinstance(b, (int, float)) and not isinstance(b, bool) else 0), i, n.strip(), cat,
+                     r[COL["D"]] != "No", cur))
+    out, seen = [], set()
+    for _, _, n, cat, req, cur in sorted(rows, reverse=True):
+        if n.lower() in seen:
+            continue
+        seen.add(n.lower())
+        out.append({"notes": n[:60], "category": cat, "required": req, "currency": cur})
+        if len(out) == limit:
+            break
+    return out
+
+
 def cells_for(entry: dict) -> list[Any]:
     """A..H for an entry payload."""
     amount = round(float(entry["amount"]), 2)
