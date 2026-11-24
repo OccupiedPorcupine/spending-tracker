@@ -5,6 +5,7 @@ import asyncio
 import datetime as dt
 import json
 import logging
+import os
 import re
 import sqlite3
 from typing import Literal
@@ -194,6 +195,7 @@ async def meta(request: Request, conn: sqlite3.Connection = Depends(get_db)):
         notes = []
     s = settings()
     return {
+        "ai": bool(os.environ.get("OPENAI_API_KEY")),
         "categories": cats,
         "notes": notes,
         "last_currency": get_setting(conn, "last_currency", "SGD"),

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { navigate, type Phase, type Recent } from '../App';
+import { AiBox, Drafts } from '../components/AiBox';
 import { Keypad } from '../components/Keypad';
 import { Seg } from '../components/Seg';
 import { api, errorText } from '../lib/api';
@@ -7,7 +8,7 @@ import { money, press, symbol, value } from '../lib/amount';
 import { shortDate, todaySG } from '../lib/dates';
 import * as queue from '../lib/queue';
 import { load, save } from '../lib/store';
-import type { Currency, Direction, Entry, Meta, Row } from '../lib/types';
+import type { Currency, Direction, Draft, Entry, Meta, Row } from '../lib/types';
 
 interface Props { phase: Phase; meta: Meta; recent: Recent | null; items: queue.QItem[]; onChanged: () => void }
 
@@ -23,6 +24,9 @@ export function QuickAdd({ phase, meta, recent, items, onChanged }: Props) {
   const [justSaved, setJustSaved] = useState<string | null>(null);
   const [saved, setSaved] = useState<Set<string>>(new Set());
   const [noteFocus, setNoteFocus] = useState(false);
+  const [fromAi, setFromAi] = useState(false); // the form was filled by the AI box: the row gets "app-ai"
+  const [drafts, setDrafts] = useState<Draft[]>([]);
+  const [aiMsg, setAiMsg] = useState<string | null>(null);
   const notesRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => queue.onSaved(({ id }) => setSaved((s) => new Set(s).add(id))), []);
@@ -58,11 +62,47 @@ export function QuickAdd({ phase, meta, recent, items, onChanged }: Props) {
     notesRef.current?.blur();
   }
 
+  function fill(d: Draft) {
+    setAmount(d.amount ? String(d.amount) : '');
+    setDirection(d.direction);
+    setCategory(d.category);
+    setRequired(d.required);
+    setCurrency(d.currency);
+    setNotes(d.notes);
+    setDate(d.date);
+    setFromAi(true);
+    setAiMsg(d.amount ? null : 'Enter the amount, then save.');
+  }
+
+  function fallback(text: string, why: string) {
+    setNotes(text.slice(0, 120));
+    setFromAi(false);
+    setAiMsg(`${why} Your text is in Notes; fill in the rest.`);
+  }
+
+  function editDraft(i: number) {
+    fill(drafts[i]);
+    setDrafts(drafts.filter((_, j) => j !== i));
+  }
+
+  async function saveDrafts() {
+    const entries: Entry[] = drafts.map((d) => ({
+      id: crypto.randomUUID(), amount: d.amount!, direction: d.direction, category: d.category!, required: d.required,
+      currency: d.currency, notes: d.notes, date: d.date, source: 'app-ai',
+    }));
+    for (const e of entries) await queue.enqueue(e);
+    setDrafts([]);
+    setJustSaved(entries[entries.length - 1].id);
+    setFlash(`${entries.length} entries`);
+    setTimeout(() => setFlash(null), 1600);
+    void queue.flush().catch(() => undefined);
+  }
+
   async function submit() {
     if (!canSave) return;
     const entry: Entry = {
       id: crypto.randomUUID(), amount: amt, direction, category: category!, required, currency,
-      notes: notes.trim(), date, source: 'app',
+      notes: notes.trim(), date, source: fromAi ? 'app-ai' : 'app',
     };
     await queue.enqueue(entry);
     save('currency', currency);
@@ -70,6 +110,7 @@ export function QuickAdd({ phase, meta, recent, items, onChanged }: Props) {
     setFlash(`${money(direction === 'expense' ? -amt : amt, currency, true)} ${category}`);
     setTimeout(() => setFlash(null), 1600);
     setAmount(''); setCategory(null); setNotes(''); setDirection('expense'); setRequired(true); setDate(todaySG());
+    setFromAi(false); setAiMsg(null);
     notesRef.current?.blur();
     void queue.flush().catch(() => undefined);
   }
@@ -113,6 +154,14 @@ export function QuickAdd({ phase, meta, recent, items, onChanged }: Props) {
             <div><span>Week</span><b className="mono">{money(recent.totals.week)}</b></div>
             <div><span>Month</span><b className="mono">{money(recent.totals.month)}</b></div>
           </div>
+        )}
+
+        {phase === 'open' && meta.ai !== false && (
+          <AiBox onFill={fill} onDrafts={(d) => { setDrafts(d); setAiMsg(null); }} onFallback={fallback} />
+        )}
+        {aiMsg && <p className="notice ai-msg" role="status">{aiMsg}</p>}
+        {drafts.length > 0 && (
+          <Drafts drafts={drafts} onSaveAll={() => void saveDrafts()} onEdit={editDraft} onClose={() => setDrafts([])} />
         )}
 
         <form className="form" onSubmit={(e) => { e.preventDefault(); void submit(); }}>

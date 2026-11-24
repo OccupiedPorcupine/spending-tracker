@@ -32,7 +32,19 @@ export interface Totals { today: number; week: number; month: number; income_mon
 
 export interface NoteHint { notes: string; category: string; required: boolean; currency: Currency | null; uses: number }
 
+/** One entry read by the AI parser, not yet saved. */
+export interface Draft {
+  amount: number | null;
+  direction: Direction;
+  category: string | null;
+  required: boolean;
+  currency: Currency;
+  notes: string;
+  date: string;
+}
+
 export interface Meta {
+  ai?: boolean;
   categories: string[];
   notes: NoteHint[];
   last_currency: Currency;
