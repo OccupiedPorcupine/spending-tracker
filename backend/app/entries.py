@@ -18,6 +18,7 @@ from . import __version__
 from .config import settings
 from .db import connect, get_db, get_setting, now_ms, set_setting
 from .parse import month_usage
+from .target import TARGETS, active_sheet_id, backend_for, current_target, service_account_email, sheet_id_for
 from .writer import (SheetError, SheetService, cells_for, fingerprint_for, note_suggestions, recent, today, totals)
 from .sheets import ROW_LIMIT, ROW_WARN
 
@@ -81,6 +82,12 @@ async def write_from_ledger(svc: SheetService, entry_id: str) -> dict:
             raise KeyError(entry_id)
         if row["status"] in ("written", "deleted"):
             return {"status": row["status"], "row": row["sheet_row"]}
+        if row["sheet_id"] != active_sheet_id(conn):
+            # queued for the other sheet before a switch: never write it into this one
+            conn.execute("UPDATE entries SET status = 'failed', last_error = ?, updated_at = ? WHERE id = ?",
+                         ("meant for the other sheet; switch back to send it", now_ms(), entry_id))
+            conn.commit()
+            return {"status": "failed", "error": "meant for the other sheet", "retry": False}
         payload = json.loads(row["payload"])
         conn.execute("UPDATE entries SET attempts = attempts + 1, updated_at = ? WHERE id = ?", (now_ms(), entry_id))
         conn.commit()
@@ -127,7 +134,7 @@ async def create_entry(entry: Entry, request: Request, conn: sqlite3.Connection 
         now = now_ms()
         conn.execute(
             "INSERT INTO entries (id, payload, status, sheet_id, created_at, updated_at) VALUES (?, ?, 'pending', ?, ?, ?)",
-            (entry.id, json.dumps(entry.payload()), settings().active_sheet_id, now, now))
+            (entry.id, json.dumps(entry.payload()), active_sheet_id(conn), now, now))
         conn.commit()
     elif row["status"] == "written":
         return {"status": "written", "row": row["sheet_row"], "already": True}
@@ -156,6 +163,8 @@ async def delete_entry(entry_id: str, _: Empty, request: Request, conn: sqlite3.
         raise HTTPException(404, "only entries made by this app can be deleted")
     if row["status"] == "deleted":
         return {"status": "deleted"}
+    if row["sheet_id"] != active_sheet_id(conn):
+        raise HTTPException(409, "this entry is in the other sheet; switch back in settings to change it")
     svc = service(request)
     if row["status"] != "written":
         # never reached the sheet; make sure it never will, then check the sheet anyway
@@ -176,7 +185,8 @@ async def get_recent(request: Request, fresh: int = 0, conn: sqlite3.Connection 
     rows = recent(grid, 15)
     ids = [r["id"] for r in rows if r["id"]]
     mine = {r["id"] for r in conn.execute(
-        f"SELECT id FROM entries WHERE status = 'written' AND id IN ({','.join('?' * len(ids))})", ids)} if ids else set()
+        f"SELECT id FROM entries WHERE status = 'written' AND sheet_id = ? AND id IN ({','.join('?' * len(ids))})",
+        [active_sheet_id(conn), *ids])} if ids else set()
     for r in rows:
         r["editable"] = r["id"] in mine
     used = svc.last_used_row(grid)
@@ -199,7 +209,7 @@ async def meta(request: Request, conn: sqlite3.Connection = Depends(get_db)):
         "categories": cats,
         "notes": notes,
         "last_currency": get_setting(conn, "last_currency", "SGD"),
-        "target": s.sheet_target,
+        "target": current_target(conn),
         "version": __version__,
         "today": today().isoformat(),
     }
@@ -216,7 +226,7 @@ async def status(request: Request, conn: sqlite3.Connection = Depends(get_db)):
     counts = {r["status"]: r["n"] for r in conn.execute("SELECT status, COUNT(*) n FROM entries GROUP BY status")}
     last = get_setting(conn, "last_write_at")
     return {
-        "sheet": {"title": title, "target": settings().sheet_target, "locale": locale, "time_zone": tz},
+        "sheet": {"title": title, "target": current_target(conn), "locale": locale, "time_zone": tz},
         "ledger": counts,
         "last_write_at": int(last) if last else None,
         "last_sheet_call": {"ok": svc.health.ok, "at": svc.health.at},
@@ -227,18 +237,53 @@ async def status(request: Request, conn: sqlite3.Connection = Depends(get_db)):
 
 class SettingsBody(BaseModel):
     require_unlock: bool | None = None
+    sheet_target: Literal["dev", "live"] | None = None
 
 
 @router.get("/settings")
 def get_settings(conn: sqlite3.Connection = Depends(get_db)):
-    return {"require_unlock": get_setting(conn, "require_unlock", "0") == "1"}
+    return {
+        "require_unlock": get_setting(conn, "require_unlock", "0") == "1",
+        "sheet_target": current_target(conn),
+        "targets": {t: bool(sheet_id_for(t)) for t in TARGETS},
+    }
 
 
 @router.post("/settings")
-def put_settings(body: SettingsBody, conn: sqlite3.Connection = Depends(get_db)):
+async def put_settings(body: SettingsBody, request: Request, conn: sqlite3.Connection = Depends(get_db)):
     if body.require_unlock is not None:
         set_setting(conn, "require_unlock", "1" if body.require_unlock else "0")
+        conn.commit()
+    if body.sheet_target is not None and body.sheet_target != current_target(conn):
+        await switch_sheet(body.sheet_target, service(request), conn)
     return get_settings(conn)
+
+
+async def switch_sheet(target: str, svc: SheetService, conn: sqlite3.Connection) -> None:
+    """Point the app at the other sheet, after checking it is safe to."""
+    if not sheet_id_for(target):
+        raise HTTPException(409, f"no sheet ID is configured for {target} (set it in .env on the server)")
+    # Only entries bound for the current sheet block a switch (anything left for the other sheet
+    # waits, untouched, until the app is switched back to it).
+    waiting = conn.execute("SELECT COUNT(*) FROM entries WHERE status IN ('pending', 'failed') AND sheet_id = ?",
+                           (active_sheet_id(conn),)).fetchone()[0]
+    if waiting:
+        raise HTTPException(409, f"{waiting} entries are still waiting to reach the current sheet; "
+                                 "let them sync (or undo them) before switching")
+    try:
+        new = backend_for(target)
+        m = await asyncio.to_thread(new.meta)
+        await asyncio.to_thread(new.grid, False)
+    except Exception as e:  # noqa: BLE001
+        who = service_account_email() or "the app's service account"
+        log.warning("switch to %s refused: cannot open the sheet (%s)", target, type(e).__name__)
+        raise HTTPException(409, f"the app can't open the {target} sheet. Share it with {who} as Editor, "
+                                 "then try again") from None
+    async with svc.lock:  # no write is half-way through while the target changes
+        set_setting(conn, "sheet_target", target)
+        conn.commit()
+        svc.reset()
+    log.info("sheet target switched to %s (%s)", target, m.title)
 
 
 async def retry_loop(svc: SheetService, every: float = 60) -> None:

@@ -12,7 +12,7 @@ from . import __version__, auth, entries, parse
 from .config import settings
 from .db import connect, migrate
 from .security import gate
-from .sheets import GoogleSheet
+from .target import active_backend, current_target
 from .writer import SheetService
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -21,13 +21,8 @@ STATIC = Path(os.environ.get("STATIC_DIR", Path(__file__).parent.parent / "stati
 
 
 def google_backend():
-    s = settings()
-    if os.environ.get("SHEET_BACKEND") == "fake":  # local development only
-        from .sheets import FakeSheet
-        return FakeSheet.demo()
-    if not s.active_sheet_id:
-        raise RuntimeError(f"no sheet ID configured for SHEET_TARGET={s.sheet_target}")
-    return GoogleSheet(s.active_sheet_id, s.sheet_tab, s.google_sa_file)
+    """The backend for whichever sheet is active now (dev or live, chosen on the settings page)."""
+    return active_backend()
 
 
 @asynccontextmanager
@@ -64,7 +59,7 @@ def health():
         conn.close()
     h = app.state.sheet.health if hasattr(app.state, "sheet") else None
     return {"ok": True, "version": __version__, "schema": v, "commit": os.environ.get("GIT_COMMIT", "dev"),
-            "target": settings().sheet_target,
+            "target": current_target(),
             "sheets": {"last_ok": h.ok if h else None, "last_at": h.at if h else None}}
 
 

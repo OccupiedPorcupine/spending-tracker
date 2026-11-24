@@ -74,6 +74,13 @@ class SheetService:
     def invalidate(self) -> None:
         self._values = None
 
+    def reset(self) -> None:
+        """Forget the backend and every cache: the next call opens the (newly) active sheet."""
+        self._backend = None
+        self._values = None
+        self._cats = None
+        self.health = Health()
+
     async def values(self, max_age: float = VALUES_TTL) -> list[list[Any]]:
         """Computed values of A2:W, cached briefly."""
         if self._values and time.monotonic() - self._values[0] < max_age:

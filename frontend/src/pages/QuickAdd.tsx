@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { navigate, type Phase, type Recent } from '../App';
 import { AiBox, Drafts } from '../components/AiBox';
+import { GearIcon } from '../components/Icons';
 import { Keypad } from '../components/Keypad';
 import { Seg } from '../components/Seg';
 import { api, errorText } from '../lib/api';
@@ -144,7 +145,7 @@ export function QuickAdd({ phase, meta, recent, items, onChanged }: Props) {
       <header className="top">
         <span className="brand">Spend{meta.target === 'dev' && <small className="dev">dev sheet</small>}</span>
         {status && <span className={'sync ' + (stuck || queue.needsUnlock ? 'bad' : '')} role="status">{status}</span>}
-        {phase === 'open' && <a className="icon-btn" href="/settings" onClick={(e) => { e.preventDefault(); navigate('/settings'); }} aria-label="Settings">⚙</a>}
+        {phase === 'open' && <a className="icon-btn" href="/settings" onClick={(e) => { e.preventDefault(); navigate('/settings'); }} aria-label="Settings"><GearIcon /></a>}
       </header>
 
       <main className="page">

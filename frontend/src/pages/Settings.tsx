@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { navigate } from '../App';
 import { api, errorText } from '../lib/api';
 import { lockNow } from '../lib/auth';
+import { Seg } from '../components/Seg';
 import * as queue from '../lib/queue';
 import { save } from '../lib/store';
 import type { Meta } from '../lib/types';
@@ -13,29 +14,54 @@ interface Status {
   last_sheet_call: { ok: boolean | null; at: number | null };
   version: string;
 }
+type Target = 'dev' | 'live';
+interface AppSettings { require_unlock: boolean; sheet_target: Target; targets: Record<Target, boolean> }
 interface Passkey { id: string; name: string; created_at: number; last_used: number | null; this_device: boolean }
 
 const when = (ms: number | null) => (ms ? new Date(ms).toLocaleString('en-SG', { dateStyle: 'medium', timeStyle: 'short' }) : 'never');
 
-export function Settings({ meta, items, onLocked }: { meta: Meta; items: queue.QItem[]; onLocked: () => void }) {
+export function Settings({ meta, items, onLocked, onSheetChanged }: {
+  meta: Meta; items: queue.QItem[]; onLocked: () => void; onSheetChanged: () => void;
+}) {
   const [status, setStatus] = useState<Status | null>(null);
   const [keys, setKeys] = useState<Passkey[]>([]);
   const [strict, setStrict] = useState(false);
+  const [target, setTarget] = useState<Target | null>(null);
+  const [targets, setTargets] = useState<Record<Target, boolean>>({ dev: true, live: false });
+  const [switching, setSwitching] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
   const load = async () => {
     const [s, k, st] = await Promise.all([
-      api<Status>('/api/status'), api<{ passkeys: Passkey[] }>('/api/passkeys'), api<{ require_unlock: boolean }>('/api/settings'),
+      api<Status>('/api/status'), api<{ passkeys: Passkey[] }>('/api/passkeys'), api<AppSettings>('/api/settings'),
     ]);
     if (s.status === 200) setStatus(s.data);
     if (k.status === 200) setKeys(k.data.passkeys);
-    if (st.status === 200) setStrict(st.data.require_unlock);
+    if (st.status === 200) { setStrict(st.data.require_unlock); setTarget(st.data.sheet_target); setTargets(st.data.targets); }
   };
   useEffect(() => { void load().catch(() => setMsg('Could not load settings')); }, []);
 
   async function toggleStrict(v: boolean) {
     const r = await api<{ require_unlock: boolean }>('/api/settings', { body: { require_unlock: v } });
     if (r.status === 200) { setStrict(r.data.require_unlock); save('strict', r.data.require_unlock); }
+  }
+
+  async function switchSheet(t: Target) {
+    if (t === target || switching) return;
+    const text = t === 'live'
+      ? 'Switch to the LIVE sheet? New entries will go into your real 2026 Journal.'
+      : 'Switch to the dev copy? New entries will go into "2026 Journal (dev)", not your real sheet.';
+    if (!confirm(text)) return;
+    setSwitching(true);
+    setMsg(null);
+    try {
+      const r = await api<AppSettings>('/api/settings', { body: { sheet_target: t }, timeout: 20000 });
+      if (r.status === 200) { setTarget(r.data.sheet_target); onSheetChanged(); await load(); } else setMsg(errorText(r.data));
+    } catch {
+      setMsg('Could not switch: offline or locked.');
+    } finally {
+      setSwitching(false);
+    }
   }
 
   async function revoke(p: Passkey) {
@@ -56,6 +82,14 @@ export function Settings({ meta, items, onLocked }: { meta: Meta; items: queue.Q
         {msg && <p className="err">{msg}</p>}
         <section className="card">
           <h2>Sheet</h2>
+          {target && (
+            <>
+              <Seg label="Sheet to write to" value={target} onChange={(t) => void switchSheet(t)}
+                options={[{ value: 'dev', label: 'Dev copy' }, ...(targets.live ? [{ value: 'live' as Target, label: 'Live sheet' }] : [])]} />
+              {switching && <p className="muted small">Checking the sheet…</p>}
+              {items.length > 0 && <p className="muted small">Entries waiting on this device go to whichever sheet is selected when they sync.</p>}
+            </>
+          )}
           <dl>
             <dt>Writing to</dt><dd><b>{status?.sheet.title ?? '…'}</b> {status?.sheet.target === 'dev' && <span className="badge queued">dev copy</span>}</dd>
             <dt>Tab</dt><dd>Daily Spending</dd>
