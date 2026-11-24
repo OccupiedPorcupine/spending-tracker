@@ -1,0 +1,10 @@
+[Unit]
+Description=Run the Spend backup every night
+
+[Timer]
+OnCalendar=*-*-* 03:45:00
+RandomizedDelaySec=10m
+Persistent=true
+
+[Install]
+WantedBy=timers.target

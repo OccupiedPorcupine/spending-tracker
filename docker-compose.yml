@@ -1,0 +1,23 @@
+name: spend
+
+services:
+  app:
+    build:
+      context: .
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-dev}
+    image: spend-app:latest
+    restart: unless-stopped
+    env_file: ../.env
+    environment:
+      GIT_COMMIT: ${GIT_COMMIT:-dev}
+    ports:
+      # localhost only: gym's Caddy (host networking) proxies spend.munyau.space to it
+      - "127.0.0.1:${APP_PORT:-8001}:8000"
+    volumes:
+      - spend-data:/data
+      - ${BACKUP_DIR:-./backups}:/backups
+      - ${GOOGLE_SA_FILE_HOST:-./secrets/google-sa.json}:/run/secrets/google-sa.json:ro
+
+volumes:
+  spend-data:

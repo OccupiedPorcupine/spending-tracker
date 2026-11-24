@@ -1,0 +1,54 @@
+/* Design tokens, shared with Quant Gym (gym.munyau.space) so the two apps look like siblings. */
+:root {
+  --bg: #e9ecf1;
+  --surface: #f8f9fc;
+  --ink: #111520;
+  --muted: #5a6476;
+  --line: #d3d8e2;
+  --accent: #2b44e0;
+  --on-accent: #ffffff;
+  --good: #13824a;
+  --warn: #a26a12;
+  --bad: #c8361f;
+
+  --font-display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --font-body: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --r-sm: 9px;
+  --r-md: 12px;
+  --r-lg: 18px;
+  --gap: 10px;
+  --page: 1000px;
+  --col: 460px;
+  --head: 44px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1117;
+    --surface: #161a22;
+    --ink: #e7eaf0;
+    --muted: #8e97a8;
+    --line: #272d39;
+    --accent: #8e9bff;
+    --on-accent: #0e1117;
+    --good: #45d08a;
+    --warn: #e5b04c;
+    --bad: #ff6a52;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1117;
+  --surface: #161a22;
+  --ink: #e7eaf0;
+  --muted: #8e97a8;
+  --line: #272d39;
+  --accent: #8e9bff;
+  --on-accent: #0e1117;
+  --good: #45d08a;
+  --warn: #e5b04c;
+  --bad: #ff6a52;
+  color-scheme: dark;
+}
