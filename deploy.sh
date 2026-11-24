@@ -55,6 +55,7 @@ echo "==> restart"
 "${C[@]}" up -d --remove-orphans
 
 PORT="$(grep -E '^APP_PORT=' "$DIR/.env" | cut -d= -f2 || true)"; PORT="${PORT:-8001}"
+PUBLIC_HOST="$(grep -E '^PUBLIC_HOST=' "$DIR/.env" | cut -d= -f2 || true)"; PUBLIC_HOST="${PUBLIC_HOST:-spending.munyau.space}"
 echo "==> health"
 for i in $(seq 1 30); do
   if out="$(curl -fsS -m 3 "http://127.0.0.1:$PORT/api/health" 2>/dev/null)"; then echo "$out"; ok=1; break; fi
@@ -68,7 +69,7 @@ if ! docker exec "$CADDY" grep -q '^import /etc/caddy/sites/' /etc/caddy/Caddyfi
   echo "WARNING: $CADDY does not import $SITES yet (gym's Caddyfile change); skipping"
 else
   mkdir -p "$SITES"
-  NEW="$(sed "s/__APP_PORT__/$PORT/" deploy/caddy/spend.caddy)"
+  NEW="$(sed -e "s/__APP_PORT__/$PORT/" -e "s/__PUBLIC_HOST__/$PUBLIC_HOST/" deploy/caddy/spend.caddy)"
   if [ "$NEW" != "$(cat "$SITES/spend.caddy" 2>/dev/null)" ]; then
     [ -f "$SITES/spend.caddy" ] && cp "$SITES/spend.caddy" "$SITES/spend.caddy.bak-$(date +%Y%m%d-%H%M%S)"
     printf '%s\n' "$NEW" > "$SITES/spend.caddy.tmp" && mv "$SITES/spend.caddy.tmp" "$SITES/spend.caddy"

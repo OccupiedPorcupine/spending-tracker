@@ -9,7 +9,7 @@ def _list(name: str, default: str) -> list[str]:
 
 @dataclass(frozen=True)
 class Settings:
-    public_host: str = field(default_factory=lambda: os.environ.get("PUBLIC_HOST", "spend.munyau.space"))
+    public_host: str = field(default_factory=lambda: os.environ.get("PUBLIC_HOST", "spending.munyau.space"))
     db_path: str = field(default_factory=lambda: os.environ.get("DB_PATH", "/data/spend.db"))
     # Which sheet the app writes to. "dev" uses SHEET_ID_DEV; "live" uses SHEET_ID and must be set on purpose.
     sheet_target: str = field(default_factory=lambda: os.environ.get("SHEET_TARGET", "dev"))

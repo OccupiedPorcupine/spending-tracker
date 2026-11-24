@@ -9,6 +9,7 @@ import argparse
 import datetime as dt
 
 from .auth import CODE_MAX_FAILURES, CODE_TTL_MS, new_enroll_code
+from .config import settings
 from .db import connect, migrate
 
 
@@ -34,7 +35,7 @@ def main(argv=None) -> None:
             conn.commit()
             print(f"\n  Enrolment code: {code}\n")
             print(f"  Valid for {CODE_TTL_MS // 60000} minutes, for one passkey. {CODE_MAX_FAILURES} wrong tries burn it.")
-            print("  Open https://spend.munyau.space/enroll on the device and enter it.\n")
+            print(f"  Open https://{settings().public_host}/enroll on the device and enter it.\n")
         elif a.cmd == "passkeys":
             for r in conn.execute("SELECT * FROM credentials ORDER BY created_at"):
                 print(f"{r['id'][:12]}…  {r['name']:<20} created {_ts(r['created_at'])}  last used {_ts(r['last_used'])}")

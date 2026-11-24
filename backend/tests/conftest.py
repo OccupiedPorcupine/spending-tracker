@@ -14,7 +14,7 @@ from webauthn.helpers import bytes_to_base64url, encode_cbor
 
 from app.sheets import FakeSheet, to_serial
 
-HOST = "spend.munyau.space"
+HOST = "spending.munyau.space"
 ORIGIN = f"https://{HOST}"
 
 

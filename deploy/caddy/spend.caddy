@@ -1,6 +1,8 @@
-# Spend: imported by gym's Caddy (see README "Reverse proxy"). Same tailnet-only setup as gym:
-# Caddy binds only mysites' Tailscale IP (global default_bind), certificates come from DNS-01.
-spend.munyau.space {
+# Spend's site block, imported by gym's Caddy from /home/maize/caddy-sites.
+# deploy.sh fills in __PUBLIC_HOST__ and __APP_PORT__ from the server's .env.
+# Same tailnet-only setup as gym: Caddy binds only mysites' Tailscale IP (global default_bind),
+# and certificates come from DNS-01.
+__PUBLIC_HOST__ {
 	tls {
 		dns cloudflare {env.CLOUDFLARE_API_TOKEN}
 		resolvers 1.1.1.1 1.0.0.1

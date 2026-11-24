@@ -12,7 +12,7 @@ services:
     environment:
       GIT_COMMIT: ${GIT_COMMIT:-dev}
     ports:
-      # localhost only: gym's Caddy (host networking) proxies spend.munyau.space to it
+      # localhost only: gym's Caddy (host networking) proxies PUBLIC_HOST (spending.munyau.space) to it
       - "127.0.0.1:${APP_PORT:-8001}:8000"
     volumes:
       - spend-data:/data
