@@ -51,6 +51,7 @@ export function App() {
   const [meta, setMeta] = useState<Meta>(() => load('meta', FALLBACK_META));
   const [recent, setRecent] = useState<Recent | null>(null);
   const [update, setUpdate] = useState(updateReady());
+  const [passkeys, setPasskeys] = useState<number | null>(null);
   const items = useQueue();
 
   const refresh = useCallback(async (fresh = false) => {
@@ -69,8 +70,9 @@ export function App() {
 
   const check = useCallback(async () => {
     try {
-      const s = await api<{ authenticated: boolean; require_unlock: boolean }>('/api/auth/state', { timeout: 5000 });
+      const s = await api<{ authenticated: boolean; require_unlock: boolean; passkeys: number }>('/api/auth/state', { timeout: 5000 });
       if (s.status !== 200) throw new Offline('bad status');
+      setPasskeys(s.data.passkeys);
       save('strict', s.data.require_unlock);
       if (s.data.authenticated) {
         setPhase('open');
@@ -116,7 +118,7 @@ export function App() {
 
   let page;
   if (path === '/enroll') page = <Enroll onDone={unlocked} />;
-  else if (phase === 'locked') page = <Lock waiting={items.length} onUnlocked={unlocked} />;
+  else if (phase === 'locked') page = <Lock waiting={items.length} passkeys={passkeys} onUnlocked={unlocked} />;
   else if (path === '/settings' && phase === 'open') page = <Settings meta={meta} items={items} onLocked={() => setPhase('locked')} />;
   else page = <QuickAdd phase={phase} meta={meta} recent={recent} items={items} onChanged={() => refresh(true)} />;
 
