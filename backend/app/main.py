@@ -8,7 +8,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import __version__, auth, entries, parse
+from . import __version__, auth, entries, favourites, parse
 from .config import settings
 from .db import connect, migrate
 from .security import gate
@@ -47,6 +47,7 @@ app.middleware("http")(gate)
 app.include_router(auth.router)
 app.include_router(entries.router)
 app.include_router(parse.router)
+app.include_router(favourites.router)
 
 
 @app.get("/api/health")

@@ -15,8 +15,8 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
 
 from . import __version__
-from .config import settings
 from .db import connect, get_db, get_setting, now_ms, set_setting
+from .favourites import list_favourites
 from .parse import month_usage
 from .target import TARGETS, active_sheet_id, backend_for, current_target, service_account_email, sheet_id_for
 from .writer import (SheetError, SheetService, cells_for, fingerprint_for, note_suggestions, recent, today, totals)
@@ -32,8 +32,8 @@ def service(request: Request) -> SheetService:
     return request.app.state.sheet
 
 
-class Entry(BaseModel):
-    id: str
+class EntryFields(BaseModel):
+    """What the user fills in. Shared by new entries and edits."""
     amount: float = Field(gt=0, le=1_000_000)
     direction: Literal["expense", "income"]
     category: str = Field(min_length=1, max_length=40)
@@ -41,15 +41,6 @@ class Entry(BaseModel):
     currency: Literal["SGD", "MYR"]
     notes: str = Field(default="", max_length=120)
     date: dt.date
-    source: Literal["app", "app-ai"] = "app"
-
-    @field_validator("id")
-    @classmethod
-    def _uuid(cls, v: str) -> str:
-        v = v.lower()
-        if not UUID.match(v):
-            raise ValueError("id must be a UUID")
-        return v
 
     @field_validator("amount")
     @classmethod
@@ -67,6 +58,19 @@ class Entry(BaseModel):
         d = self.model_dump()
         d["date"] = self.date.isoformat()
         return d
+
+
+class Entry(EntryFields):
+    id: str
+    source: Literal["app", "app-ai"] = "app"
+
+    @field_validator("id")
+    @classmethod
+    def _uuid(cls, v: str) -> str:
+        v = v.lower()
+        if not UUID.match(v):
+            raise ValueError("id must be a UUID")
+        return v
 
 
 def _ledger(conn: sqlite3.Connection, entry_id: str):
@@ -178,6 +182,40 @@ async def delete_entry(entry_id: str, _: Empty, request: Request, conn: sqlite3.
     return {"status": "deleted", "row": gone}
 
 
+@router.post("/entries/{entry_id}/edit")
+async def edit_entry(entry_id: str, body: EntryFields, request: Request, conn: sqlite3.Connection = Depends(get_db)):
+    """Change an entry the app wrote. The row is found by its ID and only rewritten if nobody changed
+    its amount, date or notes by hand since; the ID and source in G:H stay as they were."""
+    row = _ledger(conn, entry_id.lower())
+    if row is None:
+        raise HTTPException(404, "only entries made by this app can be edited")
+    if row["status"] == "deleted":
+        raise HTTPException(409, "this entry was deleted")
+    if row["status"] != "written":
+        raise HTTPException(409, "this entry hasn't reached the sheet yet; edit it once it has synced")
+    if row["sheet_id"] != active_sheet_id(conn):
+        raise HTTPException(409, "this entry is in the other sheet; switch back in settings to change it")
+    svc = service(request)
+    if body.category not in await svc.categories():
+        raise HTTPException(422, f"unknown category {body.category!r}")
+    before = json.loads(row["payload"])
+    after = before | body.payload()
+    try:
+        res = await svc.update(row["id"], row["fingerprint"], cells_for(after))
+    except SheetError as e:
+        raise HTTPException(409 if not e.retry else 503, str(e)) from None
+    except Exception as e:  # noqa: BLE001
+        log.warning("edit of %s failed: %s", row["id"], type(e).__name__)
+        raise HTTPException(503, "couldn't reach the sheet; try again") from None
+    now = now_ms()
+    conn.execute("INSERT INTO entry_edits (entry_id, before, after, sheet_row, at) VALUES (?, ?, ?, ?, ?)",
+                 (row["id"], row["payload"], json.dumps(after), res.row, now))
+    conn.execute("UPDATE entries SET payload = ?, fingerprint = ?, sheet_row = ?, last_error = ?, updated_at = ? WHERE id = ?",
+                 (json.dumps(after), fingerprint_for(after), res.row, res.detail or None, now, row["id"]))
+    log.info("entry %s edited (row %s)", row["id"], res.row)
+    return {"status": "written", "row": res.row, "verified": res.verified}
+
+
 @router.get("/recent")
 async def get_recent(request: Request, fresh: int = 0, conn: sqlite3.Connection = Depends(get_db)):
     svc = service(request)
@@ -203,11 +241,16 @@ async def meta(request: Request, conn: sqlite3.Connection = Depends(get_db)):
         notes = note_suggestions(grid)
     except Exception:  # noqa: BLE001
         notes = []
-    s = settings()
+    try:
+        title = (await svc.meta()).title
+    except Exception:  # noqa: BLE001
+        title = None
     return {
         "ai": bool(os.environ.get("OPENAI_API_KEY")),
         "categories": cats,
         "notes": notes,
+        "favourites": list_favourites(conn),
+        "sheet_title": title,
         "last_currency": get_setting(conn, "last_currency", "SGD"),
         "target": current_target(conn),
         "version": __version__,

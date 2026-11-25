@@ -176,15 +176,24 @@ class SheetService:
             log.info("entry %s deleted (was row %s)", entry_id, row)
             return row
 
-    async def update(self, entry_id: str, fingerprint: str | None, cells: list[Any]) -> int:
+    async def update(self, entry_id: str, fingerprint: str | None, cells: list[Any]) -> WriteResult:
+        """Rewrite A..H of the row holding `entry_id`. Refuses if the row was changed by hand since the
+        app last wrote it, unless it already holds exactly these values (a retried edit)."""
         async with self.lock:
-            row, _ = await self._locate(entry_id, fingerprint)
+            grid = await self.call(lambda: self.backend.grid(False))
+            row = self.find_id(grid, entry_id)
             if row is None:
-                raise SheetError(f"entry {entry_id} is not in the sheet", retry=False)
+                raise SheetError(f"entry {entry_id} is not in the sheet any more", retry=False)
+            now = fingerprint_of(grid[row - 2])
+            if fingerprint is not None and now not in (fingerprint, fingerprint_of(cells + [None] * 15)):
+                raise SheetError(f"row {row} has entry {entry_id} but its amount, date or notes changed in the sheet; "
+                                 "not touching it", retry=False)
             await self.call(self.backend.update_row, row, cells)
             self.invalidate()
-            log.info("entry %s updated (row %s)", entry_id, row)
-            return row
+            check = await self.call(self.backend.check_row, row)
+            detail = "" if check.ok else f"read-back: A number {check.a_is_number}, B date {check.b_is_date}, U number {check.u_is_number}"
+            log.info("entry %s updated (row %s)%s", entry_id, row, f" WARNING {detail}" if detail else "")
+            return WriteResult(row, check.ok, detail=detail)
 
 
 def fingerprint_of(row: list[Any]) -> str:

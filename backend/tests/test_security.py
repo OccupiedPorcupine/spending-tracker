@@ -28,6 +28,7 @@ def test_protected_routes_need_a_session(client):
         assert client.get(path).status_code == 401, path
     assert client.post("/api/entries", json=entry()).status_code == 401
     assert client.post("/api/entries/x/delete", json={}).status_code == 401
+    assert client.post("/api/entries/x/edit", json={}).status_code == 401
 
 
 def test_writes_need_exact_origin(authed):
