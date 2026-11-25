@@ -205,3 +205,36 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 800; text-transform:
 .drafts .amt.pos { color: var(--good); }
 .drafts-actions { display: grid; grid-template-columns: auto 1fr; gap: 8px; }
 .drafts-actions .btn { min-height: 48px; }
+
+/* ---------- favourites ---------- */
+/* One row that scrolls sideways, so a long list never pushes the form down. */
+.favs {
+  display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  margin: 0 calc(-1 * max(16px, env(safe-area-inset-left))); padding: 0 max(16px, env(safe-area-inset-left));
+  scroll-padding: 0 16px;
+}
+.favs::-webkit-scrollbar { display: none; }
+.fav {
+  flex: none; min-height: 48px; max-width: 46vw; padding: 4px 12px; display: flex; flex-direction: column; align-items: flex-start; justify-content: center;
+  border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface); color: var(--ink); text-align: left;
+}
+.fav b { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.fav small { font-size: 12px; color: var(--muted); }
+.fav:active { background: var(--line); }
+.notes-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+.star {
+  width: 48px; min-height: 48px; display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface); color: var(--muted);
+}
+.star:disabled { opacity: .4; cursor: default; }
+.star[aria-pressed="true"] { color: var(--warn); border-color: var(--warn); }
+.notice.bad { color: var(--bad); border-color: var(--bad); }
+
+/* ---------- editing a saved row ---------- */
+.form.editing { border: 2px solid var(--accent); border-radius: var(--r-lg); padding: 8px; margin: 0 -8px; }
+.edit-bar { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; }
+.edit-bar div { display: flex; flex-direction: column; min-width: 0; }
+.edit-bar b { font-family: var(--font-display); text-transform: uppercase; letter-spacing: .04em; font-size: 16px; color: var(--accent); }
+.edit-bar small { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.btn-ghost.danger { color: var(--bad); }
+.recent li.editing { box-shadow: inset 3px 0 0 var(--accent); }

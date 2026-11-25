@@ -43,10 +43,24 @@ export interface Draft {
   date: string;
 }
 
+/** A one-tap preset. With an amount, tapping it saves straight away; without one, it fills the form. */
+export interface Favourite {
+  id: number;
+  name: string;
+  amount: number | null;
+  direction: Direction;
+  category: string;
+  required: boolean;
+  currency: Currency;
+  notes: string;
+}
+
 export interface Meta {
   ai?: boolean;
   categories: string[];
   notes: NoteHint[];
+  favourites?: Favourite[];
+  sheet_title?: string | null;
   last_currency: Currency;
   target: 'dev' | 'live';
   version: string;

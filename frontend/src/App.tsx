@@ -15,7 +15,7 @@ export interface Recent { rows: Row[]; totals: Totals; today: string; rows_left:
 
 const STRICT_MS = 5 * 60 * 1000;
 const FALLBACK_META: Meta = {
-  categories: ['Food', 'Things', 'Revenue', 'Loan'], notes: [], last_currency: 'SGD', target: 'dev', version: '', today: '',
+  categories: ['Food', 'Things', 'Revenue', 'Loan'], notes: [], favourites: [], last_currency: 'SGD', target: 'dev', version: '', today: '',
 };
 
 export function navigate(path: string) {
@@ -119,7 +119,7 @@ export function App() {
   let page;
   if (path === '/enroll') page = <Enroll onDone={unlocked} />;
   else if (phase === 'locked') page = <Lock waiting={items.length} passkeys={passkeys} onUnlocked={unlocked} />;
-  else if (path === '/settings' && phase === 'open') page = <Settings meta={meta} items={items} onLocked={() => setPhase('locked')} onSheetChanged={() => void refresh(true)} />;
+  else if (path === '/settings' && phase === 'open') page = <Settings meta={meta} items={items} onLocked={() => setPhase('locked')} onSheetChanged={() => void refresh(true)} onMetaChanged={() => void refresh()} />;
   else page = <QuickAdd phase={phase} meta={meta} recent={recent} items={items} onChanged={() => refresh(true)} />;
 
   return (

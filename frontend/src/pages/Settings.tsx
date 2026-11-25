@@ -6,13 +6,15 @@ import { Seg } from '../components/Seg';
 import * as queue from '../lib/queue';
 import { save } from '../lib/store';
 import { currentTheme, setTheme, type Theme } from '../lib/theme';
-import type { Meta } from '../lib/types';
+import { money } from '../lib/amount';
+import type { Favourite, Meta } from '../lib/types';
 
 interface Status {
   sheet: { title: string | null; target: string; locale: string | null; time_zone: string | null };
   ledger: Record<string, number>;
   last_write_at: number | null;
   last_sheet_call: { ok: boolean | null; at: number | null };
+  ai?: { model: string; enabled: boolean; calls: number; ok: number; input_tokens: number; output_tokens: number; cost_usd: number };
   version: string;
 }
 type Target = 'dev' | 'live';
@@ -21,8 +23,8 @@ interface Passkey { id: string; name: string; created_at: number; last_used: num
 
 const when = (ms: number | null) => (ms ? new Date(ms).toLocaleString('en-SG', { dateStyle: 'medium', timeStyle: 'short' }) : 'never');
 
-export function Settings({ meta, items, onLocked, onSheetChanged }: {
-  meta: Meta; items: queue.QItem[]; onLocked: () => void; onSheetChanged: () => void;
+export function Settings({ meta, items, onLocked, onSheetChanged, onMetaChanged }: {
+  meta: Meta; items: queue.QItem[]; onLocked: () => void; onSheetChanged: () => void; onMetaChanged: () => void;
 }) {
   const [status, setStatus] = useState<Status | null>(null);
   const [keys, setKeys] = useState<Passkey[]>([]);
@@ -32,11 +34,14 @@ export function Settings({ meta, items, onLocked, onSheetChanged }: {
   const [switching, setSwitching] = useState(false);
   const [theme, setThemeState] = useState<Theme>(currentTheme);
   const [msg, setMsg] = useState<string | null>(null);
+  const [favs, setFavs] = useState<Favourite[]>(meta.favourites ?? []);
 
   const load = async () => {
-    const [s, k, st] = await Promise.all([
+    const [s, k, st, f] = await Promise.all([
       api<Status>('/api/status'), api<{ passkeys: Passkey[] }>('/api/passkeys'), api<AppSettings>('/api/settings'),
+      api<{ favourites: Favourite[] }>('/api/favourites'),
     ]);
+    if (f.status === 200) setFavs(f.data.favourites);
     if (s.status === 200) setStatus(s.data);
     if (k.status === 200) setKeys(k.data.passkeys);
     if (st.status === 200) { setStrict(st.data.require_unlock); setTarget(st.data.sheet_target); setTargets(st.data.targets); }
@@ -63,6 +68,16 @@ export function Settings({ meta, items, onLocked, onSheetChanged }: {
       setMsg('Could not switch: offline or locked.');
     } finally {
       setSwitching(false);
+    }
+  }
+
+  async function removeFavourite(f: Favourite) {
+    if (!confirm(`Remove the favourite "${f.name}"?`)) return;
+    try {
+      const r = await api<{ favourites: Favourite[] }>(`/api/favourites/${f.id}/delete`, { body: {} });
+      if (r.status === 200) { setFavs(r.data.favourites); onMetaChanged(); } else setMsg(errorText(r.data));
+    } catch {
+      setMsg('Could not remove it: offline or locked.');
     }
   }
 
@@ -98,6 +113,34 @@ export function Settings({ meta, items, onLocked, onSheetChanged }: {
             <dt>Last sheet call</dt><dd>{status ? (status.last_sheet_call.ok === false ? 'failed' : 'ok') + ', ' + when(status.last_sheet_call.at) : '…'}</dd>
             <dt>Last saved entry</dt><dd>{when(status?.last_write_at ?? null)}</dd>
           </dl>
+        </section>
+        <section className="card">
+          <h2>Favourites</h2>
+          {favs.length ? (
+            <ul className="keys">
+              {favs.map((f) => (
+                <li key={f.id}>
+                  <div><b>{f.name}</b>
+                    <small>{f.amount === null ? 'amount typed each time' : money(f.direction === 'income' ? f.amount : -f.amount, f.currency, true)} · {f.category}{f.required ? '' : ' · extra'}{f.notes && f.notes !== f.name ? ` · "${f.notes}"` : ''}</small></div>
+                  <button type="button" className="btn-ghost sm" onClick={() => void removeFavourite(f)}>Remove</button>
+                </li>
+              ))}
+            </ul>
+          ) : <p className="muted small">None yet.</p>}
+          <p className="muted small">To add one, fill in the form and tap the star next to Notes. A favourite with an amount saves in one tap; without one, it fills the form and you type the amount.</p>
+        </section>
+        <section className="card">
+          <h2>AI quick entry</h2>
+          {status?.ai ? (
+            <dl>
+              <dt>Status</dt><dd>{status.ai.enabled ? 'on' : 'off (no API key on the server)'}</dd>
+              <dt>Model</dt><dd>{status.ai.model}</dd>
+              <dt>This month</dt><dd>{status.ai.calls} {status.ai.calls === 1 ? 'request' : 'requests'}{status.ai.calls > status.ai.ok ? `, ${status.ai.calls - status.ai.ok} failed` : ''}</dd>
+              <dt>Tokens</dt><dd className="mono">{status.ai.input_tokens.toLocaleString()} in · {status.ai.output_tokens.toLocaleString()} out</dd>
+              <dt>Est. cost</dt><dd className="mono">US${status.ai.cost_usd < 0.01 && status.ai.cost_usd > 0 ? status.ai.cost_usd.toFixed(4) : status.ai.cost_usd.toFixed(2)}</dd>
+            </dl>
+          ) : <p className="muted small">…</p>}
+          <p className="muted small">The estimate uses the token counts OpenAI reports and the list price. Your OpenAI billing page has the exact figure.</p>
         </section>
         <section className="card">
           <h2>Appearance</h2>
