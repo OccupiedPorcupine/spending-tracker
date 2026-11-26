@@ -193,9 +193,38 @@ class GoogleSheet:
         return RowCheck(num("A"), num("B") and b_fmt in ("DATE", "DATE_TIME"),
                         vals[COL["B"]].get("formattedValue", ""), num("U"), q)
 
+    def _row_count(self) -> int:
+        r = self._service().spreadsheets().get(
+            spreadsheetId=self.id, fields="sheets.properties(sheetId,gridProperties.rowCount)").execute()
+        gid = self.meta().gid
+        return next(sh["properties"]["gridProperties"]["rowCount"] for sh in r["sheets"] if sh["properties"]["sheetId"] == gid)
+
     def delete_row(self, row: int) -> None:
-        self._batch([{"deleteDimension": {"range": {
-            "sheetId": self.meta().gid, "dimension": "ROWS", "startIndex": row - 1, "endIndex": row}}}])
+        self._batch(self.delete_requests(row, self._row_count()))
+
+    def delete_requests(self, row: int, row_count: int) -> list[dict]:
+        """Delete the row, then put a blank row (with the Q:W formulas) back just inside the end of the
+        range, in one atomic batch. A bare deleteDimension would shrink the sheet and every range the
+        Dashboard reads (named ranges ending at row 1001) by one row each time."""
+        gid = self.meta().gid
+        reqs: list[dict] = [{"deleteDimension": {"range": {
+            "sheetId": gid, "dimension": "ROWS", "startIndex": row - 1, "endIndex": row}}}]
+        end = min(row_count, ROW_LIMIT)  # last row of the ranges before the delete
+        if end < 4:
+            return reqs
+        # After the delete the ranges end at row end-1; inserting above that row stretches them back to `end`.
+        new = end - 1  # 1-based row of the inserted blank row
+        span = {"startColumnIndex": COL["Q"], "endColumnIndex": COL["W"] + 1}
+        reqs += [
+            {"insertDimension": {"range": {"sheetId": gid, "dimension": "ROWS", "startIndex": new - 1, "endIndex": new},
+                                 "inheritFromBefore": True}},
+            {"copyPaste": {
+                "source": {"sheetId": gid, "startRowIndex": new - 2, "endRowIndex": new - 1, **span},
+                "destination": {"sheetId": gid, "startRowIndex": new - 1, "endRowIndex": new, **span},
+                "pasteType": "PASTE_FORMULA",
+            }},
+        ]
+        return reqs
 
     def check_edit(self) -> None:
         # The Sheets API has no permission check, so write the title it already has: a change of
@@ -331,7 +360,10 @@ class FakeSheet:
                 if isinstance(nxt[c], str) and nxt[c].startswith("="):
                     nxt[c] = self.formula(c, r)
             self.rows[r] = nxt
-        self.rows.pop(last, None)
+        # like GoogleSheet.delete_requests: the sheet keeps its size, the last row is blank with formulas
+        self.rows[last] = [None] * COLS
+        for c in FORMULA_COLS:
+            self.rows[last][c] = self.formula(c, last)
 
     # test helpers
     def sort_rows(self, key) -> None:

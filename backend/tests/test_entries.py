@@ -178,3 +178,34 @@ def test_meta(authed):
     assert grab == {"notes": "Grab", "category": "Things", "required": False, "currency": "SGD", "uses": 1}
     authed.post("/api/entries", json=entry(currency="MYR"))
     assert authed.get("/api/meta").json()["last_currency"] == "MYR"
+
+
+def test_delete_keeps_the_sheet_size_and_ranges():
+    """deleteDimension alone shrinks the sheet and the Dashboard's named ranges (ending at row 1001)."""
+    from app.sheets import SheetMeta
+    g = GoogleSheet.__new__(GoogleSheet)
+    g._meta = SheetMeta("2026 Journal", 7, "en_US", "Asia/Kuala_Lumpur")
+    reqs = g.delete_requests(598, 1001)
+    assert reqs[0] == {"deleteDimension": {"range": {"sheetId": 7, "dimension": "ROWS", "startIndex": 597, "endIndex": 598}}}
+    # a blank row goes back in above the last row (row 1000), inside the ranges, which stretch back to 1001
+    assert reqs[1] == {"insertDimension": {"range": {"sheetId": 7, "dimension": "ROWS", "startIndex": 999, "endIndex": 1000},
+                                           "inheritFromBefore": True}}
+    # and gets the Q:W formulas from the row above it
+    cp = reqs[2]["copyPaste"]
+    assert cp["pasteType"] == "PASTE_FORMULA"
+    assert (cp["source"]["startRowIndex"], cp["destination"]["startRowIndex"]) == (998, 999)
+    assert (cp["source"]["startColumnIndex"], cp["source"]["endColumnIndex"]) == (COL["Q"], COL["W"] + 1)
+    # a grid bigger than the ranges: still restore the ranges, not the grid's end
+    assert g.delete_requests(10, 1200)[1]["insertDimension"]["range"]["startIndex"] == 999
+    # a smaller grid (the dev copy after old deletes): insert above its own last row
+    assert g.delete_requests(10, 995)[1]["insertDimension"]["range"]["startIndex"] == 993
+
+
+def test_fake_delete_keeps_the_size(authed):
+    before = max(authed.sheet.rows)
+    e = entry()
+    authed.post("/api/entries", json=e)
+    authed.post(f"/api/entries/{e['id']}/delete", json={})
+    assert max(authed.sheet.rows) == before
+    last = authed.sheet.rows[before]
+    assert last[COL["U"]] == f'=IF($E{before}="SGD", $A{before},$A{before}*MYRtoSGD)'
