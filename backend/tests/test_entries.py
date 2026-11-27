@@ -26,7 +26,7 @@ def test_write_lands_after_last_amount_row(authed):
 
 
 def test_income_is_positive_and_myr_converts(authed):
-    r = authed.post("/api/entries", json=entry(amount=50, direction="income", category="Revenue", currency="MYR", notes="Tuition Rishi"))
+    r = authed.post("/api/entries", json=entry(amount=50, direction="income", category="Revenue", currency="MYR", notes="Tuition Alex"))
     v = authed.sheet._eval(r.json()["row"])
     assert v[0] == 50 and v[4] == "MYR" and round(v[COL["U"]], 4) == round(50 * 0.3115, 4)
 
