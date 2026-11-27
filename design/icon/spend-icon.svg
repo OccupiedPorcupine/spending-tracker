@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+<defs>
+<linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#121A17"/><stop offset="1" stop-color="#070A09"/></linearGradient>
+<linearGradient id="g" gradientUnits="userSpaceOnUse" x1="380" y1="230" x2="640" y2="800"><stop offset="0" stop-color="#8CFFCB"/><stop offset="0.55" stop-color="#3BEA98"/><stop offset="1" stop-color="#10C473"/></linearGradient>
+<radialGradient id="glow" gradientUnits="userSpaceOnUse" cx="512" cy="500" r="430"><stop offset="0" stop-color="#1FE58A" stop-opacity="0.14"/><stop offset="1" stop-color="#1FE58A" stop-opacity="0"/></radialGradient>
+<pattern id="dots" width="64" height="64" patternUnits="userSpaceOnUse"><circle cx="32" cy="32" r="3" fill="#2BF29B" fill-opacity="0.09"/></pattern>
+<filter id="sh" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur in="SourceAlpha" stdDeviation="14"/><feOffset dy="16" result="b"/><feFlood flood-color="#000" flood-opacity="0.55"/><feComposite in2="b" operator="in"/><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+</defs>
+<rect width="1024" height="1024" fill="url(#bg)"/>
+
+<rect width="1024" height="1024" fill="url(#glow)"/>
+<g filter="url(#sh)">
+<path d="M 653.3 341.5 A 160 116 0 1 0 512 512 A 160 116 0 1 1 370.7 682.5" fill="none" stroke="url(#g)" stroke-width="98" stroke-linecap="round"/>
+<circle cx="653.3" cy="341.5" r="64.7" fill="url(#g)"/>
+<circle cx="370.7" cy="682.5" r="64.7" fill="url(#g)"/>
+</g>
+<circle cx="512" cy="512" r="60.8" fill="#0A0E0C"/><circle cx="653.3" cy="341.5" r="24.5" fill="#0A0E0C"/><circle cx="370.7" cy="682.5" r="24.5" fill="#0A0E0C"/>
+</svg>
