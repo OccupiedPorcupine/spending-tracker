@@ -81,7 +81,7 @@ def test_examples_are_recent_distinct_notes_without_amounts(ai):
     from app.writer import recent_examples
     ex = recent_examples(ai.sheet.grid(False), 20)
     assert ex[0]["notes"] in ("Kopi", "dinner")  # the newest date first
-    assert {e["notes"] for e in ex} >= {"Kopi", "dinner", "Grab", "lunch", "Fees from Yuzuru"}
+    assert {e["notes"] for e in ex} >= {"Kopi", "dinner", "Grab", "lunch", "Fees from Kai"}
     assert all(set(e) == {"notes", "category", "required", "currency"} for e in ex)
 
 
@@ -110,7 +110,7 @@ def test_clean_rules():
         {"amount": 0, "direction": "expense", "category": "Nope", "required": False, "currency": "XYZ",
          "notes": "  lunch   with   team ", "date": "2099-01-01"},
         {"amount": 50, "direction": "income", "category": "Food", "required": False, "currency": "MYR",
-         "notes": "fees from wade", "date": "2026-11-23"},
+         "notes": "fees from sam", "date": "2026-11-23"},
         {"amount": -3.456, "direction": "expense", "category": "Revenue", "required": True, "currency": "SGD",
          "notes": "x", "date": "bad"},
     ] + [{"amount": 1, "direction": "expense", "category": "Food", "required": True, "currency": "SGD",

@@ -58,7 +58,7 @@ received); otherwise "expense".
 otherwise true. Income is always true.
 - currency: MYR if the note says rm, myr or ringgit; SGD if it says sgd, s$ or $; otherwise the default currency.
 - notes: a few words naming the thing, without the amount, currency or date words. Capitalise the first word. \
-When an example names the same thing, reuse its wording (e.g. "Grab", "Lunch", "Rishi tuition").
+When an example names the same thing, reuse its wording (e.g. "Grab", "Lunch", "Alex tuition").
 - date: YYYY-MM-DD. Today unless the note says otherwise. "yesterday" is the day before today; a weekday name \
 means the most recent such day before today; a date without a year is in the current year.
 

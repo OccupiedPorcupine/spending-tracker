@@ -22,7 +22,7 @@ def sample_rows():
     """A small sheet shaped like the real one: complete rows, then a run of amount-only rows."""
     d = lambda s: to_serial(dt.date.fromisoformat(s))  # noqa: E731
     rows = [
-        [166.67, d("2026-11-01"), "Revenue", "Yes", "MYR", "Fees from Yuzuru"],
+        [166.67, d("2026-11-01"), "Revenue", "Yes", "MYR", "Fees from Kai"],
         [-4.5, d("2026-11-20"), "Food", "Yes", "SGD", "lunch"],
         [-12.0, d("2026-11-23"), "Things", "No", "SGD", "Grab"],
         [-1.4, d("2026-11-24"), "Food", "Yes", "SGD", "Kopi"],

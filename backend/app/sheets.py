@@ -269,7 +269,7 @@ class FakeSheet:
         for i in range(40, 0, -1):
             c, r, cur, n, a = rnd.choice(picks)
             rows.append([-round(a * rnd.uniform(0.8, 1.3), 2), to_serial(t - dt.timedelta(days=i // 2)), c, r, cur, n])
-        rows.insert(10, [350.0, to_serial(t - dt.timedelta(days=20)), "Revenue", "Yes", "SGD", "Eason"])
+        rows.insert(10, [350.0, to_serial(t - dt.timedelta(days=20)), "Revenue", "Yes", "SGD", "Ben"])
         rows += [[-7.8], [-1.6]]
         return cls([r + [None] * (COLS - len(r)) for r in rows], formula_rows=200)
 
